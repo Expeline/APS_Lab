@@ -1,0 +1,157 @@
+@startuml
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+title Вариант 24 — диаграмма классов СМО рендеринга
+class RenderingSimulation {
+ - clock: double
+ - sources: List<Source>
+ - placement: PlacementDispatcher
+ - selection: SelectionDispatcher
+ - pool: DevicePool
+ - calendar: EventCalendar
+ - stats: Statistics
+ + initialize(): void
+ + run(generationLimit: int): Summary
+ + process(event: Event): void
+ + drain(): void
+}
+class Source {
+ - id: int
+ - distribution: UniformDistribution
+ - produced: int
+ + generate(at: double): RenderJob
+ + nextDelay(): double
+}
+class UniformDistribution {
+ - minInterval: double
+ - maxInterval: double
+ + sample(): double
+}
+class RenderJob {
+ - id: long
+ - sourceId: int
+ - arrivedAt: double
+ - startedAt: double?
+ - finishedAt: double?
+ - status: JobStatus
+}
+enum JobStatus { CREATED; BUFFERED; RESERVED; RUNNING; COMPLETED; REJECTED }
+class PlacementDispatcher {
+ - buffer: JobBuffer
+ - stats: Statistics
+ + onArrival(job: RenderJob): PlacementResult
+ - chooseVictim(): RenderJob?
+}
+class JobBuffer {
+ - capacity: int
+ - slots: RenderJob?[]
+ + firstFreeSlot(): int?
+ + putAt(slot: int, job: RenderJob): void
+ + remove(job: RenderJob): int
+ + selectLowestPriorityVictim(): RenderJob?
+ + snapshotAndReserve(sourceId: int): List<long>
+ + takeReserved(jobId: long): RenderJob
+ + getWaitingJobs(): List<RenderJob>
+}
+class SelectionDispatcher {
+ - buffer: JobBuffer
+ - pool: DevicePool
+ - calendar: EventCalendar
+ - statistics: Statistics
+ - activeBatch: JobBatch?
+ + onDeviceAvailable(at: double): void
+ + onCompleted(jobId: long): void
+ - selectPrioritySource(): int?
+ - dispatchAvailable(): void
+}
+class JobBatch {
+ - sourceId: int
+ - immutableJobIds: Set<long>
+ - inFlight: Set<long>
+ - completedIds: Set<long>
+ + nextWaitingId(): long?
+ + markStarted(jobId: long): void
+ + markCompleted(jobId: long): void
+ + isFinished(): boolean
+}
+class DevicePool {
+ - devices: List<RenderWorker>
+ - ringPointer: int
+ + findFreeFromPointer(): RenderWorker?
+ + assignAndAdvancePointer(worker: RenderWorker, job: RenderJob, at: double): double
+ + release(workerId: int): void
+}
+class RenderWorker {
+ - id: int
+ - currentJob: RenderJob?
+ - busySince: double?
+ - serviceLaw: ExponentialDistribution
+ + start(job: RenderJob, at: double): double
+ + complete(at: double): RenderJob
+ + isFree(): boolean
+}
+class ExponentialDistribution {
+ - rate: double
+ + sample(): double
+}
+class EventCalendar {
+ - events: PriorityQueue<Event>
+ + schedule(event: Event): long
+ + popNext(): Event
+ + isEmpty(): boolean
+}
+class Event {
+ - id: long
+ - time: double
+ - type: EventType
+ - jobId: long?
+ - workerId: int?
+}
+enum EventType { GENERATE; COMPLETE }
+class Statistics {
+ - generatedBySource: Map<int,int>
+ - rejectedBySource: Map<int,int>
+ - completedBySource: Map<int,int>
+ - busyTimeByWorker: Map<int,double>
+ + recordGenerated(job: RenderJob): void
+ + recordRejected(job: RenderJob, reason: String): void
+ + recordStarted(job: RenderJob, workerId: int): void
+ + recordCompleted(job: RenderJob): void
+ + summarize(totalTime: double): Summary
+}
+class Summary {
+ + rejectionProbabilityBySource: Map<int,double>
+ + meanWaitBySource: Map<int,double>
+ + meanServiceBySource: Map<int,double>
+ + meanSystemTimeBySource: Map<int,double>
+ + workerUtilization: Map<int,double>
+}
+RenderingSimulation *-- "1..*" Source
+RenderingSimulation *-- "1" PlacementDispatcher
+RenderingSimulation *-- "1" SelectionDispatcher
+RenderingSimulation *-- "1" EventCalendar
+RenderingSimulation *-- "1" DevicePool
+RenderingSimulation *-- "1" Statistics
+Source *-- UniformDistribution
+Source ..> RenderJob : creates
+RenderJob --> JobStatus
+PlacementDispatcher --> JobBuffer : buffer
+PlacementDispatcher --> Statistics : stats
+SelectionDispatcher --> JobBuffer : buffer
+SelectionDispatcher --> DevicePool : pool
+SelectionDispatcher --> EventCalendar : calendar
+SelectionDispatcher --> Statistics : statistics
+SelectionDispatcher o-- "0..1" JobBatch
+JobBatch ..> RenderJob : job ids
+JobBuffer o-- "0..*" RenderJob
+DevicePool *-- "1..*" RenderWorker
+RenderWorker --> ExponentialDistribution
+RenderWorker --> RenderJob : currentJob
+EventCalendar o-- "0..*" Event
+Event --> EventType
+Statistics ..> Summary
+@enduml

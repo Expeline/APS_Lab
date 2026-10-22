@@ -1,0 +1,58 @@
+@startuml
+!pragma teoz true
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #236B8E
+skinparam ParticipantBorderColor #236B8E
+skinparam ParticipantBackgroundColor #EAF4FA
+
+title Вариант 24 — Д2Б5 пакет + Д2П2 кольцо
+participant "Прибор A" as A
+control "Движок событий" as E
+control "Диспетчер выбора" as DV
+queue "Буфер" as B
+collections "Пул приборов" as P
+control "Календарь" as C
+A -> E: COMPLETE(previousJob)
+E -> P: release(A)
+P --> E: available
+E -> DV: onDeviceAvailable() [триггер]
+DV -> B: getWaitingJobs()
+B --> DV: currentJobs
+alt Нет активного пакета
+ DV -> DV: selectMinSourceId(currentJobs) [Д2Б5]
+ DV -> B: snapshotAndReserve(selectedSource)
+ B --> DV: batchIds (фиксированный состав)
+end
+loop Для доступных приборов и ещё не запущенных batchIds
+ DV -> P: findFreeFromPointer() [Д2П2]
+ P --> DV: freeWorker / none
+ alt freeWorker exists
+  DV -> B: takeReserved(nextBatchId)
+  B --> DV: job
+  DV -> P: assignAndAdvancePointer(freeWorker, job)
+  P --> DV: completionTime
+  DV -> C: schedule(COMPLETE, completionTime)
+  C --> DV: eventId
+ else Все приборы заняты
+  break ждать освобождения прибора
+  end
+ end
+end
+note over E,DV
+Новые задания того же источника НЕ включаются в пакет.
+Они остаются в буфере до следующего пакета.
+... затем поступает очередное COMPLETE ...
+end note
+E -> DV: onDeviceAvailable()
+DV -> DV: markBatchJobComplete()
+alt Все заявки пакета завершены
+ DV -> DV: closeBatch()
+ DV -> B: getWaitingJobs() [следующий пакет]
+ B --> DV: jobs
+else Пакет ещё выполняется
+ DV -> DV: продолжить только activeBatch
+end
+@enduml

@@ -1,0 +1,35 @@
+@startuml
+!pragma teoz true
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #236B8E
+skinparam ParticipantBorderColor #236B8E
+skinparam ParticipantBackgroundColor #EAF4FA
+
+title Вариант 24 — переполнение и вытеснение [Д1ОО2]
+actor Источник as S
+control "Диспетчер постановки" as DP
+queue "Буфер" as B
+database "Статистика" as ST
+S -> DP: onArrival(newJob)
+DP -> B: firstFreeSlot() [Д1ОЗ3]
+B --> DP: none
+DP -> B: selectLowestPriorityVictim() [Д1ОО2]
+B --> DP: victim (sourceId)
+alt newJob.sourceId < victim.sourceId
+ note over DP,B: Меньший sourceId — более высокий приоритет
+ DP -> B: remove(victim)
+ B --> DP: freedSlot
+ DP -> ST: recordRejected(victim, EVICTED)
+ DP -> B: putAt(freedSlot, newJob)
+ B --> DP: placed
+else newJob.sourceId >= victim.sourceId
+ note over DP
+ Сохранить ожидающую заявку;
+ при равенстве принято правило стабильности.
+ end note
+ DP -> ST: recordRejected(newJob, OVERFLOW)
+end
+@enduml

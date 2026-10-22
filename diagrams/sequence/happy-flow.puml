@@ -1,0 +1,44 @@
+@startuml
+!pragma teoz true
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #236B8E
+skinparam ParticipantBorderColor #236B8E
+skinparam ParticipantBackgroundColor #EAF4FA
+
+title Вариант 24 — Happy Flow (прибор и буфер свободны)
+actor Источник as S
+control "Движок" as E
+control "Диспетчер постановки" as DP
+queue "Буфер" as B
+control "Диспетчер выбора" as DV
+collections "Пул приборов" as P
+participant "Узел" as W
+control "Календарь" as C
+S -> E: GENERATE(job) [ИБ, ИЗ2: U(a,b)]
+E -> DP: onArrival(job)
+DP -> B: firstFreeSlot() [Д1ОЗ3]
+B --> DP: slot 0
+DP -> B: putAt(0, job)
+B --> DP: OK
+E -> DV: onDeviceAvailable() [начальный свободный прибор]
+DV -> B: snapshotAndReserve(sourceId) [Д2Б5]
+B --> DV: batch {job}
+DV -> P: findFreeFromPointer() [Д2П2]
+P --> DV: worker
+DV -> B: takeReserved(job.id)
+B --> DV: job
+DV -> P: assignAndAdvancePointer(worker, job)
+P -> W: start(job, Exp(lambda)) [ПЗ1]
+W --> P: completionTime
+P --> DV: completionTime
+DV -> C: schedule(COMPLETE, completionTime)
+C --> DV: eventId
+... в момент завершения ...
+W -> E: COMPLETE(job)
+E -> P: release(worker)
+P --> E: OK
+E -> DV: onDeviceAvailable()
+@enduml
