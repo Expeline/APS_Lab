@@ -48,7 +48,7 @@ note over E,DV
 end note
 E -> DV: onDeviceAvailable()
 DV -> DV: markBatchJobComplete()
-alt Все заявки пакета завершены
+alt В пакете нет ожидающих и работающих заявок
  DV -> DV: closeBatch()
  DV -> B: getWaitingJobs() [следующий пакет]
  B --> DV: jobs

@@ -18,18 +18,13 @@ DP -> B: firstFreeSlot() [Д1ОЗ3]
 B --> DP: none
 DP -> B: selectLowestPriorityVictim() [Д1ОО2]
 B --> DP: victim (sourceId)
-alt newJob.sourceId < victim.sourceId
- note over DP,B: Меньший sourceId — более высокий приоритет
- DP -> B: remove(victim)
- B --> DP: freedSlot
- DP -> ST: recordRejected(victim, EVICTED)
- DP -> B: putAt(freedSlot, newJob)
- B --> DP: placed
-else newJob.sourceId >= victim.sourceId
- note over DP
- Сохранить ожидающую заявку;
- при равенстве принято правило стабильности.
- end note
- DP -> ST: recordRejected(newJob, OVERFLOW)
-end
+note over DP,B
+Меньший sourceId — более высокий приоритет.
+Среди равных выбирается последняя размещённая.
+end note
+DP -> B: remove(victim)
+B --> DP: freedSlot
+DP -> ST: recordRejected(victim, EVICTED)
+DP -> B: putAt(freedSlot, newJob)
+B --> DP: placed
 @enduml

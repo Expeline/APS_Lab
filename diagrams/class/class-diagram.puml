@@ -45,8 +45,7 @@ class RenderJob {
 
 enum JobStatus {
   CREATED
-  BUFFERED
-  RESERVED
+  WAITING
   RUNNING
   COMPLETED
   REJECTED
@@ -86,11 +85,14 @@ class SelectionDispatcher {
 class JobBatch {
   - sourceId : int
   - fixedJobIds : long[]
+  - waitingIds : long[]
+  - rejectedIds : long[]
   - runningIds : long[]
   - completedIds : long[]
   + nextWaitingId() : long
   + markStarted(jobId : long) : void
   + markCompleted(jobId : long) : void
+  + markRejected(jobId : long) : void
   + isFinished() : boolean
 }
 

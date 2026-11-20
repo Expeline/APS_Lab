@@ -33,26 +33,29 @@ alt Есть место в буфере
 else Буфер заполнен
  DP -> Buf: selectLowestPriorityVictim() [Д1ОО2]
  Buf --> DP: victim
- alt Новая заявка имеет право вытеснить victim
-  note over DP,Buf
-  Меньший номер источника = выше приоритет.
-  При равенстве сохраняем старую заявку.
-  end note
-  DP -> Buf: remove(victim)
-  Buf --> DP: removed
-  DP -> Stat: recordRejected(victim, EVICTED)
-  DP -> Buf: putAt(freedSlot, job)
-  Buf --> DP: placed
- else Новая заявка не выше по приоритету
-  DP -> Stat: recordRejected(job, OVERFLOW)
- end
+ note over DP,Buf: Среди заявок наименьшего приоритета выбивается последняя размещённая
+ DP -> Buf: remove(victim)
+ Buf --> DP: removed
+ DP -> Stat: recordRejected(victim, EVICTED)
+ DP -> Buf: putAt(freedSlot, job)
+ Buf --> DP: placed
+ DP --> Engine: victim
+ Engine -> DV: markRejected(victim)
+end
+opt После поступления есть свободный прибор
+ Engine -> DV: dispatch(t)
+ note over DV: По правилам Д2Б5 и Д2П2 ниже
 end
 == Обработка события COMPLETE ==
 Worker -> Engine: onCompleted(job, workerId)
 Engine -> Stat: recordCompleted(job, t)
 Engine -> Pool: release(workerId)
 Pool --> Engine: workerAvailable
-Engine -> DV: onDeviceAvailable(t)
+Engine -> DV: markCompleted(job)
+opt В пакете закончились ожидающие и выполняемые заявки
+ DV -> DV: closeBatch()
+end
+Engine -> DV: dispatch(t)
 DV -> Buf: getWaitingJobs()
 Buf --> DV: jobs
 alt Пакет уже активен
@@ -85,14 +88,8 @@ loop Пока есть свободные приборы и ожидающие �
   end
  end
 end
-alt Активный пакет полностью выполнен
- DV -> DV: closeBatch()
- note over DV
- Следующий пакет — после завершения текущего,
- по актуальному буферу и текущему приоритету
- end note
 note over Engine,Cal
 Начальная доступность прибора — отдельный триггер запуска DV.
-При одинаковом времени события обрабатываются детерминированно.
+При одинаковом времени COMPLETE раньше GENERATE, затем порядок записи.
 end note
 @enduml
